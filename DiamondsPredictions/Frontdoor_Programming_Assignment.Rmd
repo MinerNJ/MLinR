@@ -1,0 +1,115 @@
+---
+title: "Frontdoor Programming Assignment"
+author: "Nick Miner"
+date: "8/1/2019"
+output: pdf_document
+---
+
+## Reading in data, importing packages and setting seed. Creating new features
+## for diamond volume and the log price of the diamond. The 4 most important
+## characteristics for determining the cost of a diamond are caret, cut, color
+## and clarity. The data does not include the number of carets per diamond. To
+## work around this, we use the x, y, and z features to create the volume of 
+## each diamond as feature. The volume of a diamond directly affects its 
+## weight, and the weight of a diamond plays a large factor in its price. In
+## this way a missing feature can be substituted.
+
+## The log price is a a normalization feature since the price of a diamond can
+## vary greatly. Predictions will be made with both prices in order to 
+## establish a better idea of correlation. 
+
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE)
+set.seed(0351)
+library(caret)
+library(ggplot2)
+diamonds <- read.csv("C:/Users/nickm/Downloads/Diamonds.csv")
+diamonds <- as.data.frame(diamonds)
+diamonds$volume <- diamonds$x * diamonds$y * diamonds$z
+diamonds$`log price` <- log10(diamonds$price)
+```
+
+## Exploratory data visualization. Plotting the color, cut and clarity against
+## the price did not yield any linearity, suggesting the diamond pricing 
+## within categories is relatively fixed. Plotting the price against the
+## volume of the diamond, however, suggests a more correlational relationship
+## than any of the other features. 
+
+## Plotting the log price against the diamond's volume reinforces this idea, 
+## as normalizing the price makes clear an even more linear relationship.
+```{r}
+ggplot(diamonds, aes(price, volume)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE)
+
+ggplot(diamonds, aes(`log price`, volume)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE)
+```
+
+## Splitting the data into 80% training and 20% testing data. Removing features
+## that do not explain a significant amount of variance in the data or that
+## were used to calculate volume. 
+```{r}
+data_sample <- floor(0.8 * nrow(diamonds))
+index <- sample(seq_len(nrow(diamonds)), size = data_sample)
+diamonds_train <- diamonds[index,]
+diamonds_test <- diamonds[-index,]
+
+diamonds_train <- diamonds_train[, c(-5, -6, -7, -8, -9)]
+diamonds_test <- diamonds_test[, c(-5, -6, -7, -8, -9)]
+```
+
+## Setting a linear model to measure the effects of the features on the price
+## of the diamond. The summary for the log price suggests that cut does not 
+## play a large role in the diamond's price; the difference in variance 
+## confirms this. The log model is then updated to remove the cut feature.
+```{r}
+diamonds_lm <- lm(price ~ cut + color + clarity + volume, 
+                  data = diamonds_train)
+summary(diamonds_lm)
+
+
+diamonds_log_lm <- lm(`log price` ~ cut + color + clarity + volume,
+                      data = diamonds_train)
+summary(diamonds_log_lm)
+
+diamonds_log_lm <- lm(`log price` ~ color + clarity + volume,
+                      data = diamonds_train)
+
+```
+
+## Predictions for the testing set are made here. The linear model model for 
+## price trained on the training data is set to the test data and used to
+## predict price points for the testing diamonds. The absolute value of those 
+## points (the diamond price can't be negative) is then fed into a correlation
+## matrix. The same is done for predictions based on the log price for the 
+## diamonds. 
+
+## The correlation matrix for each linear model presents a clear view that the
+## predicted values for both the price and log price are very accurate! Most
+## of the diamond price points correlate very strongly with the the fit, upper
+## and lower bounds - all the correlation values are at least 0.95. 
+## Interestingly, the log price linear model showed even more correlation than
+## the price model, despite having one less feature. The logging of the prices
+## must have reduced variance for more accurate predictions. 
+```{r}
+lm_predictions <- predict(diamonds_lm, newdata = diamonds_test,
+                          interval = "prediction", level = 0.95)
+test_preds <- data.frame(cbind(actuals=diamonds_test$price,
+                                  predicteds=lm_predictions))
+test_preds$fit <- abs(test_preds$fit)
+
+correlation_accuracy <- cor(test_preds)
+correlation_accuracy
+
+
+lm_log_predictions <- predict(diamonds_log_lm, newdata = diamonds_test,
+                          interval = "prediction", level = 0.95)
+test_log_preds <- data.frame(cbind(actuals=diamonds_test$price,
+                                  predicteds=lm_log_predictions))
+test_log_preds$fit <- abs(test_log_preds$fit)
+
+correlation_log_accuracy <- cor(test_log_preds)
+correlation_log_accuracy
+```
