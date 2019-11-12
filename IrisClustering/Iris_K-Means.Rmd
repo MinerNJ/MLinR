@@ -1,0 +1,116 @@
+---
+title: "K-Means with Iris"
+output: html_document
+---
+
+# Setup
+```{r setup}
+library(data.table)
+library(ggplot2)
+set.seed(1234)
+iris <- fread("C:\\Users\\nminer\\R_Stuff\\datasets\\iris.csv")
+
+summary(iris)
+```
+
+# Principal Component Analysis
+
+Creating the PCA for iris by removing the non-numeric column from
+the dataset.
+```{r}
+iris_pca <- princomp(iris[, -5])
+```
+
+Summarizing the PCA provides the proportion of the total variance 
+explained by each component.
+```{r}
+summary(iris_pca)
+```
+
+The loadings for the PCA are the correlation coefficients between
+the variables/rows and the columns/factors. Squared factor loadings
+indicate the percent of variance in that variable explained by 
+the factor.
+```{r}
+iris_pca$loadings
+```
+
+The scores for the PCA represent the transformed variable values
+corresponding to a particular data point.
+```{r}
+head(iris_pca$scores)
+```
+
+# Scree Plotting
+
+Plotting the PCA on a Scree Plot. The plot shows the majority of the
+variance in the data can be explained by component 1 with 4 clusters.
+```{r}
+screeplot(iris_pca)
+```
+
+More options for scree plots.
+```{r}
+pcaCharts <- function(x) {
+    x.var <- x$sdev ^ 2
+    x.pvar <- x.var/sum(x.var)
+    print("proportions of variance:")
+    print(x.pvar)
+    
+    par(mfrow=c(2,2))
+    plot(x.pvar,xlab="Principal component", ylab="Proportion of variance explained", ylim=c(0,1.5), type='b')
+    plot(cumsum(x.pvar),xlab="Principal component", ylab="Cumulative Proportion of variance explained", ylim=c(0,1.5), type='b')
+    screeplot(x)
+    screeplot(x,type="l")
+    par(mfrow=c(1,1))
+}
+
+pcaCharts(iris_pca)
+```
+
+# Clustering
+
+K-Means Clustering on the Iris dataset (minus the non-numeric column) with 4 centroids as recommended by the scree plot.
+```{r}
+results <- kmeans(iris[, -5], 4)
+```
+
+The number of observations in each cluster.
+```{r}
+results$size
+```
+
+The values of the center datapoints for the clusters.
+```{r}
+results$centers
+```
+
+A cluster vector showing which cluster each observation belongs to.
+```{r}
+results$cluster
+```
+
+Various plots of clustering on sepal length/width and petal 
+length/width. The coloring for the 1st and 3rd plots was chosen with
+4 clusters while plots 2 and 4 are the same respective plots but 
+colored by species for only 3 colors.
+```{r}
+plot(iris[, 1:2], col=results$cluster)
+ggplot(iris, aes(x = iris$sepal.length, y = iris$sepal.width, col= iris$variety)) + geom_point()
+plot(iris[, 3:4], col=results$cluster)
+ggplot(iris, aes(x = iris$petal.length, y = iris$petal.width, col= iris$variety)) + geom_point()
+```
+
+# 3D Plot
+
+A fun 3D plot. The first 3 columns from the iris dataset are plotted
+as x, y and z coordinates with the color set from the flower 
+species.
+
+```{r, eval=FALSE}
+colors <- c("#999999", "#E69F00", "#56B4E9")
+colors <- colors[as.factor(iris$variety)]
+scatterplot3d(iris[,1:3], pch = 16, color=colors, angle = 55)
+```
+
+
